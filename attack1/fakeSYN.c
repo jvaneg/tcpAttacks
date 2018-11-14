@@ -1,7 +1,7 @@
-#include <sys/socket.h>	/* these headers are for a Linux system, but */
-#include <netinet/in.h>	/* the names on other systems are easy to guess.. */
-#include <netinet/ip.h>
-#include <netinet/tcp.h>
+#include <sys/socket.h>
+#include <netinet/in.h>	
+#include <netinet/ip.h> /* declarations for tcp header */
+#include <netinet/tcp.h> /* declarations for ip header */    
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <unistd.h>
@@ -141,17 +141,17 @@ int main(void)
     ipHeader->ip_sum = in_cksum((unsigned short *) datagram, ipHeader->ip_len >> 1);
 
     /* calculating the TCP header checksum */
-	pseudoHeader.source_address = inet_addr(SOURCE_ADDR);
-	pseudoHeader.dest_address = sockIn.sin_addr.s_addr;
-	pseudoHeader.placeholder = 0;
-	pseudoHeader.protocol = IP_TRANSPORT_PROTOCOL;
-	pseudoHeader.tcp_length = htons(sizeof(struct tcphdr));
+    pseudoHeader.source_address = inet_addr(SOURCE_ADDR);
+    pseudoHeader.dest_address = sockIn.sin_addr.s_addr;
+    pseudoHeader.placeholder = 0;
+    pseudoHeader.protocol = IP_TRANSPORT_PROTOCOL;
+    pseudoHeader.tcp_length = htons(sizeof(struct tcphdr));
+
 	
-	
-	memcpy(pseudogram , (char*) &pseudoHeader , sizeof (struct pseudo_header));
-	memcpy(pseudogram + sizeof(struct pseudo_header) , tcpHeader , sizeof(struct tcphdr));
-	
-	tcpHeader->check = in_cksum( (unsigned short*) pseudogram , 40);
+    memcpy(pseudogram , (char*) &pseudoHeader , sizeof (struct pseudo_header));
+    memcpy(pseudogram + sizeof(struct pseudo_header) , tcpHeader , sizeof(struct tcphdr));
+
+    tcpHeader->check = in_cksum( (unsigned short*) pseudogram , 40);
 
 
     /* IP_HDRINCL to tell the kernel that headers are included in the packet */
@@ -178,6 +178,5 @@ int main(void)
         sleep(1);
     }
 
-    printf("Hello world\n");
     return 0;
 }
