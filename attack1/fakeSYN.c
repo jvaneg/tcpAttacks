@@ -32,6 +32,7 @@
 /* TCP CONSTANTS */
 #define TCP_OFFSET 5            /* tcp header length. specifies the length of the TCP header in 32bit/4byte blocks */
 #define TCP_WINDOW_SIZE 65535   /* TCP window size in bytes (maximum allowed is 65535) */
+#define TCP_DEFAULT_ACK 0       /* ack of 0 for SYN connections */
 
 
 /* 96 bit (12 bytes) pseudo header needed for tcp header checksum calculation */
@@ -84,7 +85,7 @@ unsigned short  in_cksum(unsigned short *ptr, int nbytes)
 }
 
 
-int main(void)
+int main(int argc, char* argv[])
 {
     
     int rawSocket = socket(PF_INET, SOCK_RAW, IPPROTO_TCP);             /* Open the raw socket */
@@ -95,12 +96,49 @@ int main(void)
     struct tcphdr *tcpHeader = (struct tcphdr *) (datagram + sizeof (struct ip));  /* Pointer to tcp header section of datagram */
     struct sockaddr_in sockIn;                                          /* the sockaddr_in containing the destination address that is used
 			                                                               in sendto() to determine the datagrams path */
-    sockIn.sin_port = htons(DEST_PORT);                                 /* you byte-order >1byte header values to network
-			                                                               byte order (not needed on big endian machines) */
-    sockIn.sin_addr.s_addr = inet_addr(DEST_ADDR);                      /* the destination address that will be spoofed in the packet */
-
     struct pseudo_header pseudoHeader;                                  /* pseudoheader for TCP checksum calculation */
     uint8_t pseudogram[40];
+
+    /* vars that could be from command line */
+    char* destAddr;
+    uint16_t destPort;
+    char* sourceAddr;
+    uint16_t sourcePort;
+    uint32_t seqNumber;
+    uint32_t ackNumber;
+
+    /* Getting command line args */
+    sourceAddr = SOURCE_ADDR;
+    sourcePort = SOURCE_PORT;
+    destAddr = DEST_ADDR;
+    destPort = DEST_PORT;
+    seqNumber = random();
+    ackNumber = TCP_DEFAULT_ACK;
+
+    if(argc >= 5)
+    {
+        sourceAddr = argv[1];
+        sourcePort = atoi(argv[2]);
+        destAddr = argv[3];
+        destPort = atoi(argv[4]);
+
+        if(argc >= 6)
+        {
+            seqNumber = atoi(argv[5]);
+
+            if(argc == 7)
+            {
+                ackNumber = atoi(argv[6]);
+            }
+        }
+    }
+
+
+    /* setting socket info structure stuff */
+    sockIn.sin_port = htons(destPort);                                 /* you byte-order >1byte header values to network
+			                                                               byte order (not needed on big endian machines) */
+    sockIn.sin_addr.s_addr = inet_addr(destAddr);                      /* the destination address that will be spoofed in the packet */
+    
 
     memset(datagram, 0, DATAGRAM_SIZE);	/* clear the datagram buffer */
 
@@ -122,26 +160,26 @@ int main(void)
     ipHeader->ip_ttl = IP_TIME_TO_LIVE;      /* time to live, the number of hops before packet is discarded (max is 255) */
     ipHeader->ip_p = IP_TRANSPORT_PROTOCOL;      /* transport layer protocol (6 = tcp) */
     ipHeader->ip_sum = 0;		/* the datagram checksum for the whole IP datagram (set it to 0 before computing the actual checksum later) */
-    ipHeader->ip_src.s_addr = inet_addr(SOURCE_ADDR);  /* the source IP address converted to a long (SYN's can be blindly spoofed) */
+    ipHeader->ip_src.s_addr = inet_addr(sourceAddr);  /* the source IP address converted to a long (SYN's can be blindly spoofed) */
     ipHeader->ip_dst.s_addr = sockIn.sin_addr.s_addr;   /* the destination IP address converted to a long (SYN's can be blindly spoofed) */
 
     /* filling in the TCP header values */
-    tcpHeader->th_sport = htons(SOURCE_PORT);	/* the source port (arbitrary port in this case) */
-    tcpHeader->th_dport = htons(DEST_PORT);     /* the destination port */
-    tcpHeader->th_seq = htonl(random());   /* TCP sequence number (in a SYN packet, the first number is random) */
-    tcpHeader->th_ack = 0;  /* ack for prev seq number (ack sequence is 0 in the 1st packet) */
+    tcpHeader->th_sport = htons(sourcePort);	/* the source port (arbitrary port in this case) */
+    tcpHeader->th_dport = htons(destPort);     /* the destination port */
+    tcpHeader->th_seq = htonl(seqNumber);   /* TCP sequence number (in a SYN packet, the first number is random) */
+    tcpHeader->th_ack = htonl(ackNumber);  /* ack for prev seq number (ack sequence is 0 in the 1st packet) */
     tcpHeader->th_x2 = 0;   /* unused, contains binary zeroes */
-    tcpHeader->th_off = 5;		/* segment offset, specifies the length of the TCP header in 32bit/4byte blocks. (first and only tcp segment so size zero) */
+    tcpHeader->th_off = TCP_OFFSET;		/* segment offset, specifies the length of the TCP header in 32bit/4byte blocks. (first and only tcp segment so size zero) */
     tcpHeader->th_flags = TH_SYN;	/* initial connection request */
     tcpHeader->th_win = htons(TCP_WINDOW_SIZE);	/* TCP window size in bytes (maximum allowed is 65535) */
-    tcpHeader->th_sum = 0;  /* if you set a checksum to zero, your kernel's IP stack should fill in the correct checksum during transmission */
+    tcpHeader->th_sum = 0;  /* checksum, initially set to zero because we calculate it later */
     tcpHeader->th_urp = 0;  /* urgent pointer (not needed) */
 
     /* calculating the ip header checksum */
     ipHeader->ip_sum = in_cksum((unsigned short *) datagram, ipHeader->ip_len >> 1);
 
     /* calculating the TCP header checksum */
-    pseudoHeader.source_address = inet_addr(SOURCE_ADDR);
+    pseudoHeader.source_address = inet_addr(sourceAddr);
     pseudoHeader.dest_address = sockIn.sin_addr.s_addr;
     pseudoHeader.placeholder = 0;
     pseudoHeader.protocol = IP_TRANSPORT_PROTOCOL;
