@@ -17,7 +17,6 @@
 #define SOURCE_ADDR "127.0.0.2"   /* the source ip address */
 
 #define DATAGRAM_SIZE 4096      /* datagram size in bytes */
-#define PSEUDOGRAM_SIZE 40      /* pseudogram size in bytes */
 
 /* IP CONSTANTS */
 #define IP_HEADER_LENGTH 5      /* ip header length (in 32 bit octets) (this means multiply value by 4 for length in bytes) */
@@ -98,7 +97,8 @@ int main(int argc, char* argv[])
     struct sockaddr_in sockIn;                                          /* the sockaddr_in containing the destination address that is used
 			                                                               in sendto() to determine the datagrams path */
     struct pseudo_header pseudoHeader;                                  /* pseudoheader for TCP checksum calculation */
-    uint8_t pseudogram[PSEUDOGRAM_SIZE];                                /* full sized pseudo datagram for TCP checksum calculation */
+    uint8_t *pseudogram;
+    char* data = datagram + sizeof(struct iphdr) + sizeof(struct tcphdr);     /* data part of the packet */
 
     /* vars that could be from command line */
     char* destAddr;
@@ -142,6 +142,7 @@ int main(int argc, char* argv[])
     
 
     memset(datagram, 0, DATAGRAM_SIZE);	/* clear the datagram buffer */
+    strcpy(data , "Ligma, balls!"); /* put data into the datagram buffer */
 
     if(rawSocket == -1)
     {
@@ -155,7 +156,7 @@ int main(int argc, char* argv[])
     ipHeader->ip_hl = IP_HEADER_LENGTH;     /* ip header length (in 32 bit octets) (this means multiply value by 4 for length in bytes) */
     ipHeader->ip_v = IP_VERSION;      /* ip version (4 or 6) */
     ipHeader->ip_tos = IP_TYPE_OF_SERVICE;    /* Type of Service bit (used for QoS). 0x00 is normal */
-    ipHeader->ip_len = sizeof(struct ip) + sizeof(struct tcphdr);	/* total length in bytes of the ip datagram (in this case no payload) */
+    ipHeader->ip_len = sizeof(struct ip) + sizeof(struct tcphdr) + strlen(data);	/* total length in bytes of the ip datagram (in this case data is the payload) */
     ipHeader->ip_id = htonl(IP_ID);	/* the sequence number of the datagram (the value doesn't matter here) */
     ipHeader->ip_off = IP_OFF;   /* datagram fragment offset (should be zero here) */
     ipHeader->ip_ttl = IP_TIME_TO_LIVE;      /* time to live, the number of hops before packet is discarded (max is 255) */
@@ -171,7 +172,7 @@ int main(int argc, char* argv[])
     tcpHeader->th_ack = htonl(ackNumber);  /* ack for prev seq number (ack sequence is 0 in the 1st packet) */
     tcpHeader->th_x2 = 0;   /* unused, contains binary zeroes */
     tcpHeader->th_off = TCP_OFFSET;		/* segment offset, specifies the length of the TCP header in 32bit/4byte blocks. (first and only tcp segment so size zero) */
-    tcpHeader->th_flags = TH_SYN;	/* initial connection request */
+    tcpHeader->th_flags = TH_ACK | TH_PUSH;	/* ack and push message */
     tcpHeader->th_win = htons(TCP_WINDOW_SIZE);	/* TCP window size in bytes (maximum allowed is 65535) */
     tcpHeader->th_sum = 0;  /* checksum, initially set to zero because we calculate it later */
     tcpHeader->th_urp = 0;  /* urgent pointer (not needed) */
@@ -184,13 +185,17 @@ int main(int argc, char* argv[])
     pseudoHeader.dest_address = sockIn.sin_addr.s_addr;
     pseudoHeader.placeholder = 0;
     pseudoHeader.protocol = IP_TRANSPORT_PROTOCOL;
-    pseudoHeader.tcp_length = htons(sizeof(struct tcphdr));
+    pseudoHeader.tcp_length = htons(sizeof(struct tcphdr) + strlen(data));
 
+    int pseudogramSize = sizeof(struct pseudo_header) + sizeof(struct tcphdr) + strlen(data);
+    pseudogram = malloc(pseudogramSize);
 	
     memcpy(pseudogram , (char*) &pseudoHeader , sizeof (struct pseudo_header));
-    memcpy(pseudogram + sizeof(struct pseudo_header) , tcpHeader , sizeof(struct tcphdr));
+    memcpy(pseudogram + sizeof(struct pseudo_header) , tcpHeader , sizeof(struct tcphdr) + strlen(data));
 
-    tcpHeader->check = in_cksum( (unsigned short*) pseudogram , PSEUDOGRAM_SIZE);
+    tcpHeader->check = in_cksum( (unsigned short*) pseudogram , pseudogramSize);
+
+    free(pseudogram);
 
 
     /* IP_HDRINCL to tell the kernel that headers are included in the packet */
@@ -201,21 +206,18 @@ int main(int argc, char* argv[])
         printf("Warning: Cannot set HDRINCL!\n");
     }
 
-    while(1)
+  
+    //Send the packet
+    if (sendto (rawSocket, datagram, ipHeader->ip_len,	0, (struct sockaddr *) &sockIn, sizeof (sockIn)) < 0)
     {
-        //Send the packet
-        if (sendto (rawSocket, datagram, ipHeader->ip_len,	0, (struct sockaddr *) &sockIn, sizeof (sockIn)) < 0)
-        {
-            perror("sendto failed");
-        }
-        //Data sent successfully
-        else
-        {
-            printf ("Packet sent. Length : %d \n" , ipHeader->ip_len);
-        }
-
-        sleep(1);
+        perror("sendto failed");
     }
+    //Data sent successfully
+    else
+    {
+        printf ("Packet sent. Length : %d \n" , ipHeader->ip_len);
+    }
+
 
     return 0;
 }

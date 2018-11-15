@@ -17,6 +17,7 @@
 #define SOURCE_ADDR "127.0.0.2"   /* the source ip address */
 
 #define DATAGRAM_SIZE 4096      /* datagram size in bytes */
+#define PSEUDOGRAM_SIZE 40      /* pseudogram size in bytes */
 
 /* IP CONSTANTS */
 #define IP_HEADER_LENGTH 5      /* ip header length (in 32 bit octets) (this means multiply value by 4 for length in bytes) */
@@ -97,7 +98,7 @@ int main(int argc, char* argv[])
     struct sockaddr_in sockIn;                                          /* the sockaddr_in containing the destination address that is used
 			                                                               in sendto() to determine the datagrams path */
     struct pseudo_header pseudoHeader;                                  /* pseudoheader for TCP checksum calculation */
-    uint8_t pseudogram[40];
+    uint8_t pseudogram[PSEUDOGRAM_SIZE];                                /* full sized pseudo datagram for TCP checksum calculation */
 
     /* vars that could be from command line */
     char* destAddr;
@@ -189,7 +190,7 @@ int main(int argc, char* argv[])
     memcpy(pseudogram , (char*) &pseudoHeader , sizeof (struct pseudo_header));
     memcpy(pseudogram + sizeof(struct pseudo_header) , tcpHeader , sizeof(struct tcphdr));
 
-    tcpHeader->check = in_cksum( (unsigned short*) pseudogram , 40);
+    tcpHeader->check = in_cksum( (unsigned short*) pseudogram , PSEUDOGRAM_SIZE);
 
 
     /* IP_HDRINCL to tell the kernel that headers are included in the packet */
