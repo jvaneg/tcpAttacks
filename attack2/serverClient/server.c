@@ -121,7 +121,7 @@ int main(void)
 			s, sizeof s);
 		printf("server: got connection from %s\n", s);
 
-		sleep(5); /* sleep to give me time to interrupt the connection */
+		sleep(60); /* sleep to give me time to interrupt the connection */
 
 		if (!fork()) { // this is the child process
 			close(sockfd); // child doesn't need the listener
