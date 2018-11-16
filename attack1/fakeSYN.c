@@ -201,8 +201,8 @@ int main(int argc, char* argv[])
         printf("Warning: Cannot set HDRINCL!\n");
     }
 
-    while(1)
-    {
+    //while(1)
+    //{
         //Send the packet
         if (sendto (rawSocket, datagram, ipHeader->ip_len,	0, (struct sockaddr *) &sockIn, sizeof (sockIn)) < 0)
         {
@@ -214,8 +214,8 @@ int main(int argc, char* argv[])
             printf ("Packet sent. Length : %d \n" , ipHeader->ip_len);
         }
 
-        sleep(1);
-    }
+        //sleep(1);
+    //}
 
     return 0;
 }

@@ -17,6 +17,7 @@
 #define SOURCE_ADDR "127.0.0.2"   /* the source ip address */
 
 #define DATAGRAM_SIZE 4096      /* datagram size in bytes */
+#define DEFAULT_PAYLOAD "Ligma, balls!" /* juvenile joke that is the same # chars as "Hello, world!" */
 
 /* IP CONSTANTS */
 #define IP_HEADER_LENGTH 5      /* ip header length (in 32 bit octets) (this means multiply value by 4 for length in bytes) */
@@ -107,6 +108,7 @@ int main(int argc, char* argv[])
     uint16_t sourcePort;
     uint32_t seqNumber;
     uint32_t ackNumber;
+    char* payload;
 
     /* Getting command line args */
     sourceAddr = SOURCE_ADDR;
@@ -115,6 +117,8 @@ int main(int argc, char* argv[])
     destPort = DEST_PORT;
     seqNumber = random();
     ackNumber = TCP_DEFAULT_ACK;
+    payload = DEFAULT_PAYLOAD;
+
 
     if(argc >= 5)
     {
@@ -127,9 +131,14 @@ int main(int argc, char* argv[])
         {
             seqNumber = atoi(argv[5]);
 
-            if(argc == 7)
+            if(argc >= 7)
             {
                 ackNumber = atoi(argv[6]);
+
+                if(argc == 8)
+                {
+                    payload = argv[7];
+                }
             }
         }
     }
@@ -142,7 +151,7 @@ int main(int argc, char* argv[])
     
 
     memset(datagram, 0, DATAGRAM_SIZE);	/* clear the datagram buffer */
-    strcpy(data , "Ligma, balls!"); /* put data into the datagram buffer */
+    strcpy(data , payload); /* put data into the datagram buffer */
 
     if(rawSocket == -1)
     {
